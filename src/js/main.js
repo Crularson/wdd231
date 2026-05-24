@@ -1,19 +1,19 @@
-const MENU_DATA_URL = "./data/menu.json";
+const MENU_DATA_URL = "/data/menu.json";
 const NPS_PARK_URL = "https://developer.nps.gov/api/v1/parks";
 const NPS_API_KEY = import.meta.env.VITE_NPS_API_KEY;
 
-function updateParkInformation(){
-    document.getElementById("parkName").textContent = "Yellowstone"
-    document.querySelector("#parkType").textContent = "National Park"
-    document.querySelector("#parkState").textContent = "ID, WY, MT"
-    document.getElementById("heroImage").src = "./images/yellowstone.jpg"
+function loadParkData() {
+  document.getElementById("parkName").textContent = "Yellowstone";
+  document.getElementById("parkType").textContent = "National Park";
+  document.getElementById("parkStates").textContent = "WY, ID, MT";
+  document.querySelector("#park-image").src = "./images/yellowstone.jpg";
 }
 
 async function fetchParkData(parkCode = "yell") {
   const response = await fetch(`${NPS_PARK_URL}?parkCode=${parkCode}`, {
     headers: {
-      "X-Api-Key": NPS_API_KEY
-    }
+      "X-Api-Key": NPS_API_KEY,
+    },
   });
 
   const payload = await response.json();
@@ -29,10 +29,11 @@ function renderParkInfoDetails(park) {
   directionsLink.href = park.directionsUrl;
   directionsLink.textContent = "Read more";
 
-  const primaryContact = park.contacts.phoneNumbers[0]; // Assuming the first contact and first phone number is the primary one
-  document.getElementById("info-contact").textContent = primaryContact.phoneNumber;
+  const primaryContact = park.contacts.phoneNumbers.find(phone => phone.type === "Voice");
+  document.getElementById("info-contact").textContent =
+    primaryContact.phoneNumber;
 
-  const physicalAddress = park.addresses[0]; // Assuming the first address is the physical one
+  const physicalAddress = park.addresses.find(address => address.type === "Physical");
   document.getElementById("info-address").textContent =
     `${physicalAddress.line1}, ${physicalAddress.city}, ${physicalAddress.stateCode} ${physicalAddress.postalCode}`;
 }
@@ -41,24 +42,21 @@ function renderParkFeesSection(park) {
   const fees = document.getElementById("fees-entrance-fees");
   const passes = document.getElementById("fees-entrance-passes");
 
-  // We use map() and join() here to create list items from the list of entranceFees. Think of this like a fance for loop.
   fees.innerHTML = park.entranceFees
     .map(
       (fee) =>
-        `<li><strong>${fee.title}</strong>: $${fee.cost} - ${fee.description}</li>`
+        `<li><strong>${fee.title}</strong>: $${fee.cost} - ${fee.description}</li>`,
     )
     .join("");
 
-  // We use map() and join() here to create list items from the list of entrancePasses. Think of this like a fancy for loop.
   passes.innerHTML = park.entrancePasses
     .map(
       (pass) =>
-        `<li><strong>${pass.title}</strong>: $${pass.cost} - ${pass.description}</li>`
+        `<li><strong>${pass.title}</strong>: $${pass.cost} - ${pass.description}</li>`,
     )
     .join("");
 }
 
-// This new function loads the park information that was previously hard-coded in getParkInfo()
 function updateOverviewFromParkData(park) {
   const parkName = document.getElementById("parkName");
   const parkType = document.getElementById("parkType");
@@ -80,6 +78,66 @@ async function loadAndRenderParkInfo() {
   renderParkFeesSection(park);
 }
 
+function buildHeaderMenuWithThen() {
+  // Find the <ul> where header menu items will be inserted.
+  const headerMenuList = document.querySelector("#header-menu-options ul");
+  // If the target does not exist on this page, stop.
+  if (!headerMenuList) return;
+
+  // Load the JSON data, then build each <li> from menu items.
+  fetch(MENU_DATA_URL)
+    .then((response) => response.json())
+    .then((data) => {
+      // Clear any existing static or previous menu content.
+      headerMenuList.innerHTML = "";
+
+      // Create one <li> per menu item from JSON.
+      data.menu.forEach((item) => {
+        const li = document.createElement("li");
+        li.textContent = item.name;
+        li.dataset.menuId = item.id;
+        li.dataset.href = item.href;
+
+        // Preserve the special ID used by map modal logic.
+        if (item.id === "maps") {
+          li.id = "header-maps-link";
+        }
+
+        headerMenuList.appendChild(li);
+      });
+    });
+}
+
+async function buildParkMenuWithAsyncAwait() {
+  // Find the <ul> where park-menu items will be inserted.
+  const parkMenuList = document.querySelector("#park-menu ul");
+  // If the target does not exist on this page, stop.
+  if (!parkMenuList) return;
+
+  // Wait for menu JSON data.
+  const response = await fetch(MENU_DATA_URL);
+  const data = await response.json();
+
+  // Build all menu HTML at once using a template string.
+  parkMenuList.innerHTML = data.menu
+    .map(
+      (item) => `
+        <li
+          ${item.id === "maps" ? 'id="park-maps-link"' : ""}
+          data-menu-id="${item.id}"
+          data-href="${item.href}">
+          <p>${item.name}</p>
+          <p>
+            <svg>
+              <use href="${item.iconUrl}"></use>
+            </svg>
+          </p>
+        </li>
+      `,
+    )
+    .join("");
+}
+
 function setActiveSection(section) {
   const infoSection = document.getElementById("park-info");
   const feesSection = document.getElementById("park-fees");
@@ -89,7 +147,6 @@ function setActiveSection(section) {
   feesSection.classList.toggle("is-hidden", showInfo);
 }
 
-// This figures out which link was clicked by finding the closest list item to the target click.
 function resolveMenuIdFromClickTarget(target) {
   const li = target.closest("li");
   return li.dataset.menuId.trim().toLowerCase();
@@ -136,8 +193,6 @@ function addEventListeners() {
   }
 }
 
-
-
 function setupMapModalAndPromotions() {
   const headerMapsLink = document.getElementById("header-maps-link");
   const parkMapsLink = document.getElementById("park-maps-link");
@@ -153,9 +208,9 @@ function setupMapModalAndPromotions() {
     if (mapModal) mapModal.classList.add("is-hidden");
   }
 
-  headerMapsLink?.addEventListener("click", openMapModal);
-  parkMapsLink?.addEventListener("click", openMapModal);
-  mapModalClose?.addEventListener("click", closeMapModal);
+  headerMapsLink.addEventListener("click", openMapModal);
+  parkMapsLink.addEventListener("click", openMapModal);
+  mapModalClose.addEventListener("click", closeMapModal);
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
@@ -168,7 +223,7 @@ function setupMapModalAndPromotions() {
     2: "Tuesday Deal: 10% off park admissions.",
     3: "Wednesday Offer: Free junior ranger booklet with entry.",
     4: "Thursday Bonus: Free Yellowstone postcard at check-in.",
-    5: "Friday Feature: 15% off annual pass upgrade."
+    5: "Friday Feature: 15% off annual pass upgrade.",
   };
 
   const day = new Date().getDay();
@@ -180,60 +235,7 @@ function setupMapModalAndPromotions() {
     }
   }
 }
-function buildHeaderMenuWithThen() {
-  // Find the header menu <ul>.
-  const headerMenuList = document.querySelector("#header-menu-options ul");
-  if (!headerMenuList) return;
 
-  // Fetch JSON and convert response to JS object.
-  fetch(MENU_DATA_URL)
-    .then((response) => response.json())
-    .then((data) => {
-      // Remove old markup before rebuilding.
-      headerMenuList.innerHTML = "";
-
-      // Create <li> items from the JSON array.
-      data.menu.forEach((item) => {
-        const li = document.createElement("li");
-        li.textContent = item.name;
-        li.dataset.menuId = item.id;
-        li.dataset.href = item.href;
-
-        // Keep this ID for existing map modal behavior.
-        if (item.id === "maps") li.id = "header-maps-link";
-
-        headerMenuList.appendChild(li);
-      });
-    });
-}
-async function buildParkMenuWithAsyncAwait() {
-  // Find the park menu <ul>.
-  const parkMenuList = document.querySelector("#parkMenu ul");
-  if (!parkMenuList) return;
-
-  // Fetch and parse JSON with async/await.
-  const response = await fetch(MENU_DATA_URL);
-  const data = await response.json();
-
-  // Build the entire menu in one pass.
-  parkMenuList.innerHTML = data.menu
-    .map(
-      (item) => `
-        <li
-          ${item.id === "maps" ? 'id="park-maps-link"' : ""}
-          data-menu-id="${item.id}"
-          data-href="${item.href}">
-          <p>${item.name}</p>
-          <p>
-            <svg>
-              <use href="${item.iconUrl}"></use>
-            </svg>
-          </p>
-        </li>
-      `
-    )
-    .join("");
-}
 async function init() {
   // loadParkData();
   buildHeaderMenuWithThen();
@@ -247,4 +249,3 @@ async function init() {
 }
 
 init();
-

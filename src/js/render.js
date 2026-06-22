@@ -1,7 +1,28 @@
 import { readFavorites, removeFavorite } from "./storage.js";
 
+const PARK_IMAGE_BASE_PATH = "/images/parks";
+const PARK_IMAGE_FALLBACK = `${PARK_IMAGE_BASE_PATH}/placeholder.jpg`;
+
+function setParkImage(park, parkImageEl) {
+  if (!parkImageEl) return;
+
+  const parkCode = (park?.parkCode ?? "").toLowerCase().trim();
+  const localImage = parkCode ? `${PARK_IMAGE_BASE_PATH}/${parkCode}.jpg` : PARK_IMAGE_FALLBACK;
+
+  parkImageEl.onerror = () => {
+    parkImageEl.onerror = null;
+    parkImageEl.src = PARK_IMAGE_FALLBACK;
+  };
+
+  parkImageEl.src = localImage;
+  parkImageEl.alt =
+    park?.fullName || park?.name
+      ? `${park.fullName || park.name} landscape`
+      : "National park image";
+}
+
 export function renderParkData(park) {
-  if (!park) {return;}
+  if (!park) { return; }
 
   const parkName = document.getElementById("parkName");
   const parkType = document.getElementById("parkType");
@@ -12,10 +33,7 @@ export function renderParkData(park) {
   parkType.textContent = park.designation;
   parkStates.textContent = park.states;
 
-  if (park.images?.length) {
-    parkImage.src = park.images[0].url;
-    parkImage.alt = park.images[0].altText || park.images[0].title;
-  }
+  setParkImage(park, parkImage);
 
   document.getElementById("info-description").textContent = park.description ?? "";
   document.getElementById("info-weather").textContent = park.weatherInfo ?? "";
@@ -52,7 +70,7 @@ export function renderParkData(park) {
 
 export function renderHeaderMenu(menuItems) {
   const list = document.querySelector("#header-menu-options ul");
-  if (!list) {return;}
+  if (!list) { return; }
 
   list.innerHTML = "";
   menuItems.forEach((item) => {
@@ -60,14 +78,14 @@ export function renderHeaderMenu(menuItems) {
     li.textContent = item.name;
     li.dataset.menuId = item.id;
     li.dataset.href = item.href;
-    if (item.id === "maps") {li.id = "header-maps-link";}
+    if (item.id === "maps") { li.id = "header-maps-link"; }
     list.appendChild(li);
   });
 }
 
 export function renderParkMenu(menuItems) {
   const list = document.querySelector("#park-menu ul");
-  if (!list) {return;}
+  if (!list) { return; }
 
   list.innerHTML = menuItems
     .map(
@@ -84,7 +102,7 @@ export function renderParkMenu(menuItems) {
 export function setActiveSection(section) {
   const infoSection = document.getElementById("park-info");
   const feesSection = document.getElementById("park-fees");
-  if (!infoSection || !feesSection) {return;}
+  if (!infoSection || !feesSection) { return; }
 
   const showInfo = section === "info";
   infoSection.classList.toggle("is-hidden", !showInfo);
@@ -96,6 +114,11 @@ function resolveMenuIdFromClickTarget(target) {
   return li?.dataset?.menuId?.trim()?.toLowerCase() ?? "";
 }
 
+function setMenuState(isOpen, menuTrigger, menuOptions) {
+  menuTrigger.setAttribute("aria-expanded", String(isOpen));
+  menuOptions.setAttribute("aria-hidden", String(!isOpen));
+}
+
 export function wireSectionMenus() {
   const menuTrigger = document.querySelector("#header-menu-trigger");
   const menuOptions = document.querySelector("#header-menu-options");
@@ -105,20 +128,22 @@ export function wireSectionMenus() {
   if (menuTrigger && menuOptions) {
     menuTrigger.addEventListener("click", () => {
       menuOptions.classList.toggle("is-hidden");
+      const isOpen = menuOptions.classList.contains("is-hidden");
+      setMenuState(!isOpen, menuTrigger, menuOptions);
     });
 
     menuOptions.addEventListener("click", (event) => {
       const menuId = resolveMenuIdFromClickTarget(event.target);
-      if (menuId === "info") {setActiveSection("info");}
-      if (menuId === "fees") {setActiveSection("fees");}
+      if (menuId === "info") { setActiveSection("info"); }
+      if (menuId === "fees") { setActiveSection("fees"); }
     });
   }
 
   if (parkMenu) {
     parkMenu.addEventListener("click", (event) => {
       const menuId = resolveMenuIdFromClickTarget(event.target);
-      if (menuId === "info") {setActiveSection("info");}
-      if (menuId === "fees") {setActiveSection("fees");}
+      if (menuId === "info") { setActiveSection("info"); }
+      if (menuId === "fees") { setActiveSection("fees"); }
     });
   }
 
@@ -143,7 +168,7 @@ export function setupMapModalAndPromotions() {
   mapModalClose?.addEventListener("click", closeMapModal);
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {closeMapModal();}
+    if (event.key === "Escape") { closeMapModal(); }
   });
 
   const weekdayPromotions = {
@@ -162,7 +187,7 @@ export function setupMapModalAndPromotions() {
 
 export function renderFavorites(buildParkUrl, containerId = "favorites-section") {
   const container = document.getElementById(containerId);
-  if (!container) {return;}
+  if (!container) { return; }
 
   const favorites = readFavorites();
   if (!favorites.length) {
@@ -177,15 +202,15 @@ export function renderFavorites(buildParkUrl, containerId = "favorites-section")
       <h2>Favorite Parks</h2>
       <ul class="favorites-list">
         ${favorites
-          .map(
-            (park) => `
+      .map(
+        (park) => `
               <li>
                 <a href="${buildParkUrl(park.parkCode)}">${park.name} (${park.parkCode})</a>
                 <button type="button" class="favorite-remove" data-park-code="${park.parkCode}">(X)</button>
               </li>
             `
-          )
-          .join("")}
+      )
+      .join("")}
       </ul>
     </div>
   `;
@@ -193,7 +218,7 @@ export function renderFavorites(buildParkUrl, containerId = "favorites-section")
   container.querySelectorAll(".favorite-remove").forEach((btn) => {
     btn.addEventListener("click", (event) => {
       const code = event.currentTarget?.dataset?.parkCode;
-      if (!code) {return;}
+      if (!code) { return; }
       removeFavorite(code);
       renderFavorites(buildParkUrl, containerId);
     });
@@ -203,7 +228,7 @@ export function renderFavorites(buildParkUrl, containerId = "favorites-section")
 export function renderParkSelectorUI(parks, currentParkCode, onParkSelected) {
   const button = document.getElementById("choose-park-btn");
   const select = document.getElementById("choose-park-select");
-  if (!button || !select) {return;}
+  if (!button || !select) { return; }
 
   select.innerHTML = `
     <option value="">Select a park...</option>
@@ -221,7 +246,7 @@ export function renderParkSelectorUI(parks, currentParkCode, onParkSelected) {
 
   select.addEventListener("change", () => {
     const parkCode = select.value;
-    if (!parkCode) {return;}
+    if (!parkCode) { return; }
     const park = parks.find((p) => p.parkCode === parkCode);
     onParkSelected?.(parkCode, park);
   });
